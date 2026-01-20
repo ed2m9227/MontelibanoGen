@@ -1,0 +1,24 @@
+# R
+.Rhistory
+.RData
+.Rproj.user/
+
+# renv
+renv/library/
+renv/python/
+renv/staging/
+
+# Shiny deployment
+rsconnect/
+
+# Data
+data/raw/
+data/private/
+*.rds
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
