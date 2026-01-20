@@ -22,3 +22,11 @@ data/private/
 # OS
 .DS_Store
 Thumbs.db
+
+#Base de datos runtime
+*.sqlite
+*.db
+
+#Datos generados por la app
+data/*
+!data/.gitkeep

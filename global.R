@@ -73,4 +73,4 @@ invisible(
 # DB conection
 # ======================
 con <- db_connect()
-stopifnot(dbIsValid(con))
+onStop(function() {dbDisconnect(con)})
