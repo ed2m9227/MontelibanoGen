@@ -1,193 +1,255 @@
 dashboard_ui <- function() {
   
-  source("R/components/footer_ui.R", local = TRUE)
-  
-  dashboardPage(
+  shinydashboard::dashboardPage(
     
-    dashboardHeader(
-      title = "MontelibanoGen",
-      titleWidth = 250
-    ),
-    
-    dashboardSidebar(
-      width = 250,
-      
-      sidebarMenu(
-        id = "sidebar",
-        
-        menuItem("Plataforma", tabName = "main", icon = icon("layer-group")),
-        menuItem("Carga de Datos", tabName = "upload", icon = icon("upload")),
-        menuItem("Estadística", tabName = "stat", icon = icon("calculator")),
-        menuItem("Visualización", tabName = "viz", icon = icon("chart-bar")),
-        menuItem("Reportes", tabName = "reports", icon = icon("file-pdf")),
-        menuItem("Salir", tabName = "logout", icon = icon("sign-out-alt"))
+    # ======================
+    # HEADER
+    # ======================
+    shinydashboard::dashboardHeader(
+      title = tagList(
+        "MontelibanoGen",
+        uiOutput("global_state_header")
       )
     ),
     
-    dashboardBody(
-      
-      # =======================
-      # CSS GLOBAL
-      # =======================
-      tags$style(HTML("
-        .login-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 9999;
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        .login-box {
-          margin-top: 12vh;
-        }
-
-        .content-wrapper {
-          padding-bottom: 60px !important;
-        }
-
-        .main-footer-custom {
-          position: fixed;
-          bottom: 0;
-          left: 250px;
-          right: 0;
-          padding: 10px 15px;
-          background-color: #ecf0f5;
-          border-top: 1px solid #d2d6de;
-          z-index: 1031;
-          text-align: center;
-          font-size: 12px;
-          color: #444;
-        }
-
-        #value-boxes .small-box .inner h3 {
-          font-size: 24px;
-        }
-
-        #value-boxes .small-box .inner p {
-          font-size: 14px !important;
-        }
-      ")),
-      
-      # =======================
-      # LOGIN OVERLAY (FULL PAGE)
-      # =======================
-      conditionalPanel(
-        condition = "output.logged_in === false",
+    # ======================
+    # SIDEBAR
+    # ======================
+    shinydashboard::dashboardSidebar(
+      shinydashboard::sidebarMenu(
         
-        tags$div(
-          class = "login-overlay",
-          
-          fluidRow(
-            column(
-              width = 4,
-              offset = 4,
-              
-              div(
-                class = "login-box",
-                
-                box(
-                  title = "MontelibanoGen - Acceso",
-                  status = "primary",
-                  solidHeader = TRUE,
-                  width = 12,
-                  
-                  HTML("<p style='text-align: center;'><i class='fa fa-dna fa-3x' style='color: #3c8dbc;'></i></p>"),
-                  
-                  textInput("user", "Usuario", placeholder = "demo_admin"),
-                  passwordInput("pass", "Contraseña", placeholder = "demo123"),
-                  
-                  actionButton(
-                    "login_btn",
-                    "Ingresar",
-                    class = "btn-primary btn-block",
-                    icon = icon("sign-in-alt")
-                  ),
-                  
-                  hr(),
-                  
-                  helpText(
-                    HTML("<b>Credenciales demo:</b><br>
-                         Usuario: <code>demo_admin</code><br>
-                         Contraseña: <code>demo123</code>")
-                  ),
-                  
-                  helpText(
-                    HTML("<i class='fa fa-graduation-cap'></i> Modo evaluación académica")
-                  )
-                )
-              )
-            )
-          )
+        shinydashboard::menuItem(
+          "Plataforma",
+          tabName = "plataforma",
+          icon = icon("home")
+        ),
+        
+        shinydashboard::menuItem(
+          "Datos",
+          tabName = "data",
+          icon = icon("upload")
+        ),
+        
+        shinydashboard::menuItem(
+          "Análisis",
+          tabName = "analysis",
+          icon = icon("flask")
+        ),
+        
+        shinydashboard::menuItem(
+          "Resultados",
+          tabName = "results",
+          icon = icon("chart-line")
         )
+      )
+    ),
+    
+    # ======================
+    # BODY
+    # ======================
+    shinydashboard::dashboardBody(
+      
+      shinyjs::useShinyjs(),
+      
+      # ===== CSS =====
+      tags$head(
+        tags$style(HTML("
+          #global-footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            background: #f8f8f8;
+            border-top: 1px solid #ddd;
+            padding: 6px 12px;
+            font-size: 12px;
+            z-index: 999;
+          }
+
+          .content-wrapper {
+            padding-bottom: 60px;
+          }
+        "))
       ),
       
-      # =======================
-      # DASHBOARD REAL
-      # =======================
-      tabItems(
+      # ======================
+      # TABS
+      # ======================
+      shinydashboard::tabItems(
         
-        tabItem(
-          tabName = "main",
+        # --------------------------------------------------
+        # PLATAFORMA
+        # --------------------------------------------------
+        shinydashboard::tabItem(
+          tabName = "plataforma",
           
           fluidRow(
             box(
               width = 12,
-              title = "Bienvenido a MontelibanoGen",
+              title = "Introducción",
               status = "primary",
               solidHeader = TRUE,
-              
-              HTML("
-                <h4>Plataforma de Análisis Genómico</h4>
-                <p>Aplicación web integrada para análisis transcriptómico diferencial (RNA-seq)</p>
-
-                <h5>Flujo de trabajo:</h5>
-                <ol>
-                  <li><b>Carga de Datos:</b> Suba CSV o use dataset airway</li>
-                  <li><b>Estadística:</b> Ejecute análisis DESeq2</li>
-                  <li><b>Visualización:</b> Explore gráficos (PCA, MA, Volcano)</li>
-                  <li><b>Reportes:</b> Genere informes descargables</li>
-                  <li><b>Limpiar datos:</b> Poner datos en cero y/o salir</li>
-                </ol>
-              ")
+              "Plataforma de análisis genómico orientada a fines académicos e investigativos.
+               Permite cargar datos de conteo, ejecutar análisis DESeq2 y visualizar resultados
+               de forma interactiva.
+              Desarrollado por Eduardo Andrés Martínez M."
             )
           ),
           
-          div(
-            id = "value-boxes",
-            fluidRow(
-              valueBoxOutput("vb_samples", width = 3),
-              valueBoxOutput("vb_genes", width = 3),
-              valueBoxOutput("vb_analyses", width = 3),
-              valueBoxOutput("vb_status", width = 3)
+          fluidRow(
+            box(
+              width = 6,
+              title = "Uso de la plataforma",
+              status = "primary",
+              solidHeader = TRUE,
+              HTML("
+                <ol>
+                  <li><strong>Cargar datos</strong> (archivo de conteos o Demo Airway).</li>
+                  <li><strong>Asignar condiciones</strong> por muestra.</li>
+                  <li><strong>Ejecutar análisis</strong>:
+                    <ul>
+                      <li>Modo exploratorio (~1): PCA y QC.</li>
+                      <li>Modo contraste: MA y Volcano.</li>
+                    </ul>
+                  </li>
+                  <li><strong>Interpretar resultados</strong> según el estado del análisis.</li>
+                  <li><strong>Resetear</strong> resultados para nuevo análisis.</li>
+                </ol>
+                <p><em>Nota:</em> El análisis diferencial requiere al menos dos condiciones
+                con replicación suficiente. </p>
+              ")
+            ),
+            
+            box(
+              width = 6,
+              title = "Límites éticos y legales",
+              status = "warning",
+              solidHeader = TRUE,
+              HTML("
+                <ul>
+                  <li>Uso <strong>exclusivamente educativo e investigativo</strong>.</li>
+                  <li>No constituye <strong>diagnóstico clínico</strong>.</li>
+                  <li>No sustituye criterio profesional.</li>
+                  <li>Los resultados dependen del diseño experimental.</li>
+                </ul>
+                <p><strong>El usuario es responsable del uso e interpretación.</strong></p>
+              ")
             )
           )
         ),
         
-        tabItem(tabName = "upload", upload_module_ui("up")),
-        tabItem(tabName = "stat", statistical_module_ui("stat")),
-        tabItem(tabName = "viz", visualization_module_ui("viz")),
-        tabItem(tabName = "reports", reports_module_ui("rep")),
-        
-        tabItem(
-          tabName = "logout",
+        # --------------------------------------------------
+        # DATOS
+        # --------------------------------------------------
+        shinydashboard::tabItem(
+          tabName = "data",
+          
+          fluidRow(
+            box(
+              width = 6,
+              fileInput(
+                "data_file",
+                "Subir archivo de conteos",
+                accept = ".csv"
+              )
+            ),
+            box(
+              width = 6,
+              actionButton(
+                "load_data_btn",
+                "Cargar datos"
+              )
+            ),
+            box(
+              width = 6,
+              actionButton(
+                "load_demo_btn",
+                "Cargar demo Airway"
+              )
+            ),
+        box(
+          width = 6,
+          actionButton(
+            "reset_btn",
+            "Nuevo análisis",
+            icon = icon("rotate-left"),
+            class = "btn-warning"
+          )
+          )),
+          
           fluidRow(
             box(
               width = 12,
-              title = "Cerrar Sesión",
-              status = "danger",
+              title = "Definición de condiciones",
+              status = "info",
               solidHeader = TRUE,
-              actionButton("logout_btn", "Salir de la Plataforma",
-                           class = "btn-danger btn-lg",
-                           icon = icon("sign-out-alt"))
+              uiOutput("condition_ui")
             )
+          ),
+          
+          fluidRow(
+            box(
+              width = 12,
+              textOutput("data_clean_summary")
+            )
+          )
+        ),
+        
+        # --------------------------------------------------
+        # ANÁLISIS
+        # --------------------------------------------------
+        shinydashboard::tabItem(
+          tabName = "analysis",
+          
+          fluidRow(
+            box(
+              width = 12,
+              actionButton(
+                "run_deseq_btn",
+                "Ejecutar DESeq2"
+              )
+            )
+          )
+        ),
+        
+        # --------------------------------------------------
+        # RESULTADOS
+        # --------------------------------------------------
+        shinydashboard::tabItem(
+          tabName = "results",
+          
+          fluidRow(
+            box(
+              width = 12,
+              title = "PCA (Control de Calidad)",
+              status = "primary",
+              solidHeader = TRUE,
+              plotOutput("plot_pca", height = "400px")
+            )
+          ),
+          
+          fluidRow(
+            box(
+              width = 12,
+              title = "Estado del análisis",
+              status = "info",
+              solidHeader = TRUE,
+              verbatimTextOutput("qc_info")
+            )
+          ),
+          
+          fluidRow(
+            uiOutput("differential_ui")
           )
         )
       ),
       
-      footer_ui()
+      # ======================
+      # FOOTER GLOBAL
+      # ======================
+      tags$footer(
+        id = "global-footer",
+        uiOutput("global_state_footer")
+      )
     )
   )
 }

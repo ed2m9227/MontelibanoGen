@@ -3,7 +3,7 @@
 # Lee, valida y construye GenData
 # =========================================================
 
-read_csv_counts <- function(file_path,
+csv_counts_handler <- function(file_path,
                             organism = "Homo sapiens",
                             assay_type = "RNA-seq") {
   

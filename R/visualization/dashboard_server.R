@@ -1,196 +1,377 @@
-library(shiny)
-library(DBI)
-library(DT)
-
-dashboard_server <- function(input, output, session,
-                             logged_in,
-                             stored_data,
-                             con) {
+dashboard_server <- function(input, output, session, rv) {
   
-  logout_pending <- reactiveVal(FALSE)
+  # ======================
+  # Base de datos (lazy)
+  # ======================
+  con <- NULL
   
-  output$logged_in <- reactive({
-    logged_in() 
+  observeEvent(TRUE, {
+    con <<- db_connect()
+    session$onSessionEnded(function() {
+      if (!is.null(con)) DBI::dbDisconnect(con)
+    })
+  }, once = TRUE)
+  
+  # ======================
+  # Estado mínimo
+  # ======================
+  rv$data_loaded <- FALSE
+  rv$analysis_done <- FALSE
+  rv$demo_mode <- FALSE
+  
+  # ======================
+  # Contraste lógico
+  # ======================
+  
+  global_state <- reactive({
+    if (isTRUE(rv$demo_mode)) {
+      "DEMO"
+    } else if (!isTRUE(rv$data_loaded)) {
+      "INICIAL"
+    } else if (!isTRUE(rv$analysis_done)) {
+      "DATOS_CARGADOS"
+    } else if (!has_contrast() || !can_run_deseq_diff()) {
+      "EXPLORATORIO"
+    } else {
+      "DIFERENCIAL"
+    }
   })
-  outputOptions(output, "logged_in", suspendWhenHidden = FALSE)
   
-  # ===========================================================================
-  # LOGIN HANDLER
-  # ===========================================================================
+  has_contrast <- reactive({
+    req(rv$coldata)
+    length(unique(rv$coldata$condition)) >= 2
+  })
   
-  observeEvent(input$login_btn, {
+  has_degs <- reactive({
+    req(rv$deseq$results)
+    any(rv$deseq$results$padj < 0.05, na.rm = TRUE)
+  })
+  
+  low_replication <- reactive({
+    req(rv$coldata)
+    any(table(rv$coldata$condition) < 2)
+  })
+  
+  can_run_deseq_diff <- reactive({
+    req(rv$coldata)
+    all(table(rv$coldata$condition) >= 2)
+  })
+  
+  # ======================
+  # Carga de datos
+  # ======================
+  observeEvent(input$load_data_btn, {
     
-    #Obten credenciales
-    user_input <- input$user
-    pass_input <- input$pass
+    message("▶ BOTÓN PRESIONADO")
     
-    #Validar de que estén vacíos
-    if (is.null(user_input) || is.null(pass_input)) {
-      showNotification("Por favor ingrese usuario y contraseña", type = "error")
+    req(input$data_file)
+    
+    data <- csv_counts_handler(input$data_file$datapath)
+    
+    rv$counts   <- data
+    rv$data_loaded <- TRUE
+    
+    message("▶ DATOS CARGADOS")
+  })
+  
+  observe({
+    req(rv$data_loaded)
+    req(!isTRUE(rv$demo_mode))
+    
+    samples <- colnames(rv$counts$data)
+    
+    conds <- sapply(samples, function(s) {
+      input[[paste0("cond_", s)]]
+    })
+    
+    req(all(!is.null(conds)))
+    
+    rv$coldata <- data.frame(
+      condition = factor(conds),
+      row.names = samples
+    )
+  })
+  
+  output$data_clean_summary <- renderText({
+    req(rv$data_loaded)
+    
+    paste0(
+      "✔ Datos cargados correctamente\n",
+      "Genes: ", nrow(rv$counts$data), "\n",
+      "Muestras: ", ncol(rv$counts$data)
+    )
+  })
+  
+  # ======================
+  # DESeq2 (bajo demanda)
+  # ======================
+  observeEvent(input$run_deseq_btn, {
+    
+    req(rv$data_loaded, rv$coldata)
+    
+    n_levels <- length(unique(rv$coldata$condition))
+    min_reps <- min(table(rv$coldata$condition))
+    
+    if (n_levels < 2 || min_reps < 2) {
+      design_formula <- ~ 1
+      message("ℹ Ejecutando DESeq en modo exploratorio (~1)")
+    } else {
+      design_formula <- ~ condition
+      message("✔ Ejecutando DESeq con contraste válido")
     }
     
-    if (user_input == "" || pass_input == "") {
-      showNotification("Por favor ingrese usuario y contraseña", type = "error")
+    if (isTRUE(rv$demo_mode)) {
+      desing_formula <- ~ condition
+    } else if (can_run_deseq_diff()) 
+    {desing_formula <- ~ condition} else {
+        desing_formula <- ~ 1
+      }
+    
+    
+    dds <- deseq_prepare(
+      counts  = rv$counts$data,
+      coldata = rv$coldata,
+      design  = design_formula
+    )
+    
+    rv$deseq <- deseq_analysis(dds)
+    rv$analysis_done <- TRUE
+  })
+  
+  observeEvent(input$load_demo_btn, {
+    
+    rv$counts <- NULL
+    rv$coldata <- NULL
+    rv$deseq <- NULL
+    rv$analysis_done <- FALSE
+    
+    message("▶ DEMO AIRWAY ACTIVADA")
+      
+      counts <- assay(airway)
+      counts <- round(counts)
+      
+      
+    rv$counts <- list(data = counts)
+    rv$coldata <- data.frame(condition = factor(colData(airway)$dex,
+                             levels = c("untrt", "trt")),
+                             row.names = colnames(colnames(counts)))
+    
+    
+    rv$data_loaded <- TRUE
+    rv$demo_mode <- TRUE
+    rv$analysis_done <- FALSE
+    
+    rv$deseq <- list(
+      dds = NULL,
+      results = NULL,
+      demo_only = TRUE
+    )
+    
+  })
+  
+  
+  output$analysis_status <- renderText({
+    req(rv$analysis_done)
+    "✔ Análisis DESeq2 completado correctamente"
+  })
+  
+  output$condition_ui <- renderUI({
+    req(rv$data_loaded)
+    
+    # ======================
+    # MODO DEMO
+    # ======================
+    if (isTRUE(rv$demo_mode)) {
+      
+      tagList(
+        helpText("Demo Airway (DESeq2): condiciones experimentales predefinidas."),
+        tableOutput("demo_conditions")
+      )
+      
+      # ======================
+      # MODO USUARIO
+      # ======================
+    } else {
+      
+      samples <- colnames(rv$counts$data)
+      
+      tagList(
+        helpText("Asigne una condición por muestra (mínimo 2 condiciones para contraste)."),
+        lapply(samples, function(s) {
+          selectInput(
+            inputId = paste0("cond_", s),
+            label   = s,
+            choices = c("A", "B"),
+            selected = "A"
+          )
+        })
+      )
+    }
+  })
+  
+  observeEvent(input$reset_btn, {
+    
+    rv$data_loaded <- FALSE
+    rv$analysis_done <- FALSE
+    rv$demo_mode <- FALSE
+    
+    rv$counts <- NULL
+    rv$coldata <- NULL
+    rv$deseq <- NULL
+    
+    message("Estado reiniciado")
+    
+    
+  })
+  
+  output$global_state_header <- renderUI({
+    state <- global_state()
+    
+    style <- switch(
+      state,
+      "DEMO" = "label-primary",
+      "INICIAL" = "label-default",
+      "DATOS_CARGADOS" = "label-info",
+      "EXPLORATORIO" = "label-warning",
+      "DIFERENCIAL" = "label-success"
+    )
+    
+    tags$span(
+      class = paste("label", style),
+      paste("Estado:", state),
+      style = "margin-left:10px;"
+    )
+  })
+  
+  output$global_state_footer <- renderUI({
+    state <- global_state()
+    
+    msg <- switch(
+      state,
+      "DEMO" = "Modo DEMO – Dataset Airway (DESeq2)",
+      "INICIAL" = "Esperando carga de datos",
+      "DATOS_CARGADOS" = "Datos cargados – configure condiciones",
+      "EXPLORATORIO" = "Modo exploratorio (~1) – resultados no inferenciales",
+      "DIFERENCIAL" = "Análisis diferencial activo"
+    )
+    
+    tagList(
+      tags$span(msg),
+      tags$span(style = "float:right;",
+                "MontelibanoGen · Exploratory Release"
+      )
+    )
+  })
+  
+  output$demo_conditions <- renderTable({
+    req(rv$demo_mode, rv$coldata)
+    data.frame(
+      Sample    = rownames(rv$coldata),
+      Condition = rv$coldata$condition
+    )
+  })
+  
+  output$qc_info <- renderText({
+    req(rv$data_loaded)
+    
+    if (isTRUE(rv$demo_mode)) {
+      "Demo Airway (DESeq2): dataset canónico con replicación completa."
+    } else if (!has_contrast()) {
+      "Modo exploratorio (~1): PCA y QC habilitados."
+    } else if (!can_run_deseq_diff()) {
+      "Contraste detectado con replicación insuficiente."
+    } else {
+      "Contraste activo: análisis diferencial completo."
+    }
+  })
+  
+  # ======================
+  # UI diferencial (condicional)
+  # ======================
+  output$differential_ui <- renderUI({
+    req(rv$analysis_done)
+    
+    if (!can_run_deseq_diff()) {
+      box(
+        title = "Análisis diferencial",
+        status = "warning",
+        "Modo exploratorio (~1): solo PCA y QC disponibles."
+      )
+      
+    } else {
+      tagList(
+        box(
+          width = 6,
+          title = "MA plot",
+          plotOutput("plot_ma")
+        ),
+        box(
+          width = 6,
+          title = "Volcano plot",
+          plotOutput("plot_volcano")
+        )
+      )
+    }
+  })
+  
+  # ======================
+  # Persistencia
+  # ======================
+  observeEvent(rv$analysis_done, {
+    
+    req(con, rv$deseq)
+    
+    if (isTRUE(rv$demo_mode)) {
+      message("ℹ Demo mode: resultados no persistidos")
       return()
     }
     
-    res <- check_demo_login(input$user, input$pass) 
-    
-    if (res$ok){
+    if (!is.null(rv$deseq$results) &&
+        inherits(rv$deseq$results, "DESeqResults")) {
       
-      logged_in(TRUE)
-      stored_data$user_role <- res$role
-      stored_data$current_user <- user_input
-      
-      log_event(
-        user = input$user,
-        action = "login",
-        detail = res$role
+      save_results(
+        con     = con,
+        results = as.data.frame(rv$deseq$results),
+        meta    = rv$coldata
       )
+    }
+  })
+  
+  # ======================
+  # Visualización
+  # ======================
+  
+  output$plot_pca <- renderPlot({
+    
+    if (isTRUE(rv$demo_mode)) {
+      mat <- log2(rv$counts$data + 1)
+      pca <- prcomp(t(mat), stale = TRUE)
       
-      show_evaluation_modal()
-      
-    } else {
-      showNotification("Credenciales inválidas", type = "error")
-    }
-  }
-  )
-  
-  # ===========================================================================
-  # LLAMADA A MÓDULOS
-  # ===========================================================================
-  upload_module_server("up", logged_in, stored_data)
-  
-  statistical_module_server("stat", stored_data = stored_data, logged_in = logged_in)
-  
-  visualization_module_server("viz", stored_data = stored_data, logged_in = logged_in)
-  
-  reports_module_server("rep", logged_in, stored_data)
-
-  
-  # ===========================================================================
-  # VALUE BOXES - NOMBRES CORREGIDOS
-  # ===========================================================================
-  
-  output$vb_samples <- renderValueBox({
-    n_samples <- if (!is.null(stored_data$counts)) {
-      ncol(stored_data$counts)
-    } else {
-      0
-    }
-    
-    valueBox(
-      value = n_samples,
-      subtitle = "Muestras",
-      icon = icon("vials"),
-      color = "blue"
-    )
-  })
-  
-  output$vb_genes <- renderValueBox({
-    n_genes <- if (!is.null(stored_data$counts)) {
-      nrow(stored_data$counts)
-    } else {
-      0
-    }
-    
-    valueBox(
-      value = format(n_genes, big.mark = ","),
-      subtitle = "Genes",
-      icon = icon("dna"),
-      color = "green"
-    )
-  })
-  
-  output$vb_analyses <- renderValueBox({
-    n_analyses <- tryCatch({
-      dbGetQuery(con, "SELECT COUNT(*) FROM genomics.deseq_analysis")[[1]]
-    }, error = function(e) {
-      0
-    })
-    
-    valueBox(
-      value = n_analyses,
-      subtitle = "Análisis DESeq2",
-      icon = icon("chart-line"),
-      color = "purple"
-    )
-  })
-  
-  output$vb_status <- renderValueBox({
-    status_text <- if (!is.null(stored_data$deseq)) {
-      "Análisis Completo"
-    } else if (!is.null(stored_data$dds)) {
-      "Datos Cargados"
-    } else {
-      "Sin Datos"
-    }
-    
-    status_color <- if (!is.null(stored_data$deseq)) {
-      "green"
-    } else if (!is.null(stored_data$dds)) {
-      "yellow"
-    } else {
-      "red"
-    }
-    
-    valueBox(
-      value = status_text,
-      subtitle = "Estado del Sistema",
-      icon = icon("info-circle"),
-      color = status_color
-    )
-  })
-  
-  
-  # ===========================================================================
-  # LOGOUT
-  # ===========================================================================
-  observeEvent(input$logout_btn, {
-    if (!logout_pending()) {
-      
-      # PRIMER CLICK → LIMPIEZA
-      log_event(
-        user = stored_data$current_user,
-        action = "logout_prepare"
+      plot(
+        pca$x[,1], pca$x[,2],
+        col = as.numeric(rv$coldata$condition),
+        pch = 19,
+        xlab = "PC1",
+        ylab = "PC2",
+        main = "PCA (Demo Airway - ligero)"
       )
-      
-      # Limpieza suave
-      stored_data$counts <- NULL
-      stored_data$dds <- NULL
-      stored_data$deseq <- NULL
-      
-      logout_pending(TRUE)
-      
-      showNotification(
-        "Datos limpiados. Presione nuevamente para cerrar sesión.",
-        type = "message",
-        duration = 4
-      )
-      
     } else {
-      
-      # SEGUNDO CLICK → CIERRE REAL
-      log_event(
-        user = stored_data$current_user,
-        action = "logout"
-      )
-      
-      logged_in(FALSE)
-      
-      stored_data$current_user <- NULL
-      stored_data$user_role <- NULL
-      
-      logout_pending(FALSE)
-      
-      showNotification("Sesión cerrada", type = "warning")
-    }
+    
+    req(rv$deseq$dds)
+    
+    vsd <- DESeq2::varianceStabilizingTransformation(rv$deseq$dds, blind = FALSE)
+    
+    DESeq2::plotPCA(vsd, intgroup = "condition")}
   })
-
-
-# ===========================================================================
-# MODAL ÉTICO - ACTIVADO POR LINK EN FOOTER
-# ===========================================================================
-modal_etica_server(input, output, session)
+  
+  output$plot_volcano <- renderPlot({
+    req(can_run_deseq_diff())
+    plot_volcano(rv$deseq)
+  })
+  
+  output$plot_ma <- renderPlot({
+    req(can_run_deseq_diff())
+    plot_ma(rv$deseq)
+  })
   
 }

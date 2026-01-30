@@ -1,17 +1,15 @@
-library(DESeq2)
-
-prepare_deseq_dataset <- function(counts, coldata, desing = ~ condition) {
+deseq_prepare <- function(counts, coldata, design) {
   
   stopifnot(
-    is.matrix(counts) ||
-    is.data.frame(counts),
-    is.data.frame(coldata),
-    ncol(counts) == nrow(coldata)
+    !is.null(counts),
+    !is.null(coldata),
+    inherits(counts, "matrix") || is.data.frame(counts),
+    is.data.frame(coldata)
   )
-  
+
   DESeq2::DESeqDataSetFromMatrix(
-    countData = as.matrix(counts),
+    countData = counts,
     colData   = coldata,
-    design    = ~ condition
+    design    = design
   )
-  }
+}

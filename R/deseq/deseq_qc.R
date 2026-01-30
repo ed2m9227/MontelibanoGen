@@ -1,21 +1,26 @@
-library(DESeq2)
-library(ggplot2)
-library(dplyr)
-library(tibble)
-
 qc_pca <- function(dds, intgroup = "condition") {
   
-  vsd <- varianceStabilizingTransformation(dds, blind = TRUE)
-  pca_data <- plotPCA(vsd, intgroup = intgroup, returnData = TRUE)
+  vsd <- DESeq2::varianceStabilizingTransformation(dds, blind = TRUE)
+  
+  pca_data <- DESeq2::plotPCA(
+    vsd,
+    intgroup = intgroup,
+    returnData = TRUE
+  )
   
   percent_var <- round(100 * attr(pca_data, "percentVar"))
   
-  p <- ggplot(pca_data,
-              aes(x = PC1, y = PC2, color = .data[[intgroup]])) +
-    geom_point(size = 3, alpha = 0.8) +
-    xlab(paste0("PC1: ", percent_var[1], "%")) +
-    ylab(paste0("PC2: ", percent_var[2], "%")) +
-    theme_minimal()
+  p <- ggplot2::ggplot(
+    pca_data,
+    ggplot2::aes(PC1, PC2, color = .data[[intgroup]])
+  ) +
+    ggplot2::geom_point(size = 3, alpha = 0.8) +
+    ggplot2::labs(
+      x = paste0("PC1: ", percent_var[1], "%"),
+      y = paste0("PC2: ", percent_var[2], "%"),
+      title = "PCA"
+    ) +
+    ggplot2::theme_minimal()
   
   list(
     plot = p,
@@ -25,32 +30,26 @@ qc_pca <- function(dds, intgroup = "condition") {
 
 qc_dispersion <- function(dds) {
   
-  dds <- estimateDispersions(dds)
+  dds <- DESeq2::estimateDispersions(dds)
   
-  plotDispEsts(dds)
+  data.frame(
+    mean = mcols(dds)$baseMean,
+    dispersion = mcols(dds)$dispersion
+  )
 }
 
 qc_ma <- function(dds) {
   
-  dds <- DESeq(dds, test = "Wald", fitType = "parametric")
+  dds <- DESeq2::DESeq(dds, test = "Wald", fitType = "parametric")
   
-  res <- results(dds)
-  
-  plotMA(res, ylim = c(-5, 5))
+  as.data.frame(DESeq2::results(dds))
 }
 
 run_qc <- function(dds, condition_col = "condition") {
   
-  message("▶ Running PCA QC")
-  pca <- qc_pca(dds, condition_col)
-  
-  message("▶ Running dispersion QC")
-  qc_dispersion(dds)
-  
-  message("▶ Running MA QC")
-  qc_ma(dds)
-  
-  invisible(list(
-    pca = pca
-  ))
+  list(
+    pca = qc_pca(dds, condition_col),
+    dispersion = qc_dispersion(dds),
+    ma = qc_ma(dds)
+  )
 }

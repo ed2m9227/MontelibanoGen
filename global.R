@@ -1,76 +1,46 @@
-# =========================
+# ======================
 # DEPENDENCIAS
-# =========================
+# ======================
 library(shiny)
 library(shinyjs)
 library(DBI)
 library(RSQLite)
+library(shinydashboard)
+library(DESeq2)
 library(dplyr)
 library(ggplot2)
-library(plotly)
-library(DT)
-library(readr)
-library(readxl)
-library(jsonlite)
-library(sodium)
-library(rmarkdown)
-library(knitr)
-library(shinydashboard)
-
-# Bioconductor
-library(Biostrings)
-library(VariantAnnotation)
-library(DESeq2)
-library(biomaRt)
-library(rtracklayer)
-library(Rsamtools)
 
 # ======================
-# Utils / Core
+# CONFIGURACIÓN
 # ======================
-source("R/gendata/gendata_models.R")
-source("R/gendata/handlers/csv_counts_handler.R")
-source("R/components/modal_etica.R")
+options(shiny.maxRequestSize = 50 * 1024^2)
+
+# ======================
+# FUNCIONES AUXILIARES (PRIMERO)
+# ======================
 source("R/utils/logging.R")
 source("R/auth/demo_auth.R")
+source("R/components/footer_ui.R")
+source("R/components/modal_etica.R")
 source("R/components/modal_evaluacion.R")
 
-# ======================
+# Datos
+source("R/gendata/gendata_models.R")
+source("R/gendata/handlers/csv_counts_handler.R")
+
 # DESeq
-# ======================
-source("R/deseq/demo_airway_loader.R")
 source("R/deseq/deseq_prepare.R")
 source("R/deseq/deseq_analysis.R")
-source("R/deseq/deseq_qc.R")
 
-# ======================
-# Persistence
-# ======================
+# Persistencia
 source("R/persistence/db_connect.R")
 source("R/persistence/results_repository.R")
 
-# ======================
-# Visualization 
-# ======================
+# Visualización
 source("R/visualization/plots.R")
+
+# ======================
+# UI/SERVER (AL FINAL)
+# ======================
 source("R/visualization/dashboard_ui.R")
 source("R/visualization/dashboard_server.R")
-
-
-# ======================
-# Shiny modules
-# ======================
-invisible(
-  lapply(
-    list.files("R/shiny/modules",
-               full.names = TRUE),
-    source
-  )
-)
-
-
-# ======================
-# DB conection
-# ======================
-con <- db_connect()
-onStop(function() {dbDisconnect(con)})

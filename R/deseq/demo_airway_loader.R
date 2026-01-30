@@ -1,29 +1,17 @@
-#' Cargar dataset demo airway (SIN ejecutar DESeq2)
-#'
-#' @return Lista con counts, coldata
-#' @export
-load_airway_data <- function() {
+load_demo_airway <- function() {
   
   if (!requireNamespace("airway", quietly = TRUE)) {
-    stop("El paquete 'airway' no está instalado. Instálelo con: BiocManager::install('airway')")
+    stop("Paquete 'airway' no disponible")
   }
   
-  library(airway)
-  data(airway)
+  data("airway", package = "airway")
   
-  # Extraer matriz de conteos
-  counts <- assay(airway)
-  
-  # Extraer coldata
-  coldata <- as.data.frame(colData(airway))
-  
-  # Simplificar coldata: solo dex (tratamiento)
-  coldata <- coldata[, "dex", drop = FALSE]
-  coldata$dex <- factor(coldata$dex)
-  
-  # RETORNAR SOLO DATOS CRUDOS
   list(
-    counts = counts,
-    coldata = coldata
+    counts  = SummarizedExperiment::assay(airway),
+    coldata = as.data.frame(SummarizedExperiment::colData(airway))
   )
 }
+
+
+
+
