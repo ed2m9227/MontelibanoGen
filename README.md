@@ -39,7 +39,7 @@ interactivas y reportes exportables.
 
 ## Tecnologías utilizadas
 
--   R 4.5.1
+-   R 4.5.2
 -   Shiny
 -   DESeq2
 -   ggplot2 / plotly
@@ -50,3 +50,22 @@ interactivas y reportes exportables.
 ## Instalación local
 
 \`\`\`r install.packages("renv") renv::restore() shiny::runApp()
+
+------------------------------------------------------------------------
+
+## Airway demo fails in shinyapps.io enviroment
+
+**Description**
+
+The Airway demo dataset fails to load shinyapps.io due to network / dependency 
+restrictions.
+
+**Impact**
+
+- Does not affect core DESeq2 workflow
+- Production app remains stable
+
+**Plan**
+
+- Package Airway as local RDS
+- Re-eneble demo in future release
