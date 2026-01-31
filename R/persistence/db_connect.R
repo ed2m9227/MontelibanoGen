@@ -7,7 +7,7 @@
 #     port     = 5432,
 #     dbname   = "postgres",
 #     user     = "postgres",
-#     password = "Ex nihilo, nihil fit"
+#     password = Sys.getenv("DB_PASSWORD")
 #   )
 # }
 
