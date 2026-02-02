@@ -7,8 +7,7 @@ dashboard_ui <- function() {
     # ======================
     shinydashboard::dashboardHeader(
       title = tagList(
-        "MontelibanoGen",
-        uiOutput("global_state_header")
+        "MontelibanoGen"
       )
     ),
     
@@ -246,7 +245,7 @@ dashboard_ui <- function() {
       # ======================
       # FOOTER GLOBAL
       # ======================
-      tags$footer(
+      div(
         id = "global-footer",
         uiOutput("global_state_footer")
       )
