@@ -102,6 +102,20 @@ dashboard_server <- function(input, output, session, rv) {
     )
   })
   
+  observeEvent(input$reset_btn, {
+    
+    rv$data_loaded <- FALSE
+    rv$analysis_done <- FALSE
+    rv$demo_mode <- FALSE
+    
+    rv$counts <- NULL
+    rv$coldata <- NULL
+    rv$deseq <- NULL
+    
+    message("Estado reiniciado")
+    
+    
+  })
   # ======================
   # DESeq2 (bajo demanda)
   # ======================
@@ -138,36 +152,34 @@ dashboard_server <- function(input, output, session, rv) {
     rv$analysis_done <- TRUE
   })
   
-  observeEvent(input$load_demo_btn, {
     
-    rv$counts <- NULL
-    rv$coldata <- NULL
-    rv$deseq <- NULL
-    rv$analysis_done <- FALSE
-    
-    message("▶ DEMO AIRWAY ACTIVADA")
+    observeEvent(input$load_demo_btn, {
+      
+      rv$counts <- NULL
+      rv$coldata <- NULL
+      rv$deseq <- NULL
+      rv$analysis_done <- FALSE
+      
+      message("▶ DEMO AIRWAY ACTIVADA")
+      
+      airway <- readRDS("data/airway.rds")
       
       counts <- assay(airway)
       counts <- round(counts)
       
       
-    rv$counts <- list(data = counts)
-    rv$coldata <- data.frame(condition = factor(colData(airway)$dex,
-                             levels = c("untrt", "trt")),
-                             row.names = colnames(colnames(counts)))
-    
-    
-    rv$data_loaded <- TRUE
-    rv$demo_mode <- TRUE
-    rv$analysis_done <- FALSE
-    
-    rv$deseq <- list(
-      dds = NULL,
-      results = NULL,
-      demo_only = TRUE
-    )
-    
-  })
+      rv$counts <- list(data = counts)
+      rv$coldata <- data.frame(condition = factor(colData(airway)$dex,
+                                                  levels = c("untrt", "trt")),
+                               row.names = colnames(counts))
+      
+      
+      rv$data_loaded <- TRUE
+      rv$demo_mode <- TRUE
+      rv$analysis_done <- FALSE
+      
+      
+    })
   
   
   output$analysis_status <- renderText({
@@ -209,38 +221,14 @@ dashboard_server <- function(input, output, session, rv) {
     }
   })
   
-  observeEvent(input$reset_btn, {
-    
-    rv$data_loaded <- FALSE
-    rv$analysis_done <- FALSE
-    rv$demo_mode <- FALSE
-    
-    rv$counts <- NULL
-    rv$coldata <- NULL
-    rv$deseq <- NULL
-    
-    message("Estado reiniciado")
-    
-    
-  })
-  
   output$global_state_header <- renderUI({
-    state <- global_state()
+   req(global_state())
     
-    style <- switch(
-      state,
-      "DEMO" = "label-primary",
-      "INICIAL" = "label-default",
-      "DATOS_CARGADOS" = "label-info",
-      "EXPLORATORIO" = "label-warning",
-      "DIFERENCIAL" = "label-success"
+    div(
+      style = "display: incline-block; font-size: 12px; margin-left: 10px;",
+      paste("Estado:", global_state())
     )
     
-    tags$span(
-      class = paste("label", style),
-      paste("Estado:", state),
-      style = "margin-left:10px;"
-    )
   })
   
   output$global_state_footer <- renderUI({

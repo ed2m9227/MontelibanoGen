@@ -10,8 +10,10 @@ deseq_prepare <- function(counts, coldata, design) {
   counts <- as.matrix(counts)
   coldata <- as.data.frame(coldata)
   
+  coldata <- coldata[colnames(counts), ,drop = FALSE]
+  
   stopifnot(
-    all(colnames(counts) == rownames(coldata))
+    identical(colnames(counts), rownames(coldata))
   )
 
   DESeq2::DESeqDataSetFromMatrix(
