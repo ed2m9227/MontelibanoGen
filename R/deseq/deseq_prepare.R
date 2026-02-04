@@ -3,8 +3,15 @@ deseq_prepare <- function(counts, coldata, design) {
   stopifnot(
     !is.null(counts),
     !is.null(coldata),
-    inherits(counts, "matrix") || is.data.frame(counts),
-    is.data.frame(coldata)
+    inherits(counts, c("matrix", "data.frame")), 
+    inherits(coldata, c("data.frame", "DataFrame"))
+  )
+  
+  counts <- as.matrix(counts)
+  coldata <- as.data.frame(coldata)
+  
+  stopifnot(
+    all(colnames(counts) == rownames(coldata))
   )
 
   DESeq2::DESeqDataSetFromMatrix(
