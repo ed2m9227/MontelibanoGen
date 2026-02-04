@@ -4,7 +4,7 @@ editor_options:
     wrap: 72
 ---
 
-# Nombre del Proyecto
+# MontelibanoGen 
 
 Aplicación web desarrollada en **R Shiny** para análisis transcriptómico
 mediante **DESeq2**, orientada a investigación biomédica y académica.
